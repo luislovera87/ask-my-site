@@ -7,8 +7,8 @@ code — with every call visibly mutating shared page state and logged in an on-
 
 ## Note on the `@mcp-b/global` API
 
-The brief for this project assumed tools would be registered on `window.mcp`. That's not how the package
-actually works: `@mcp-b/global` polyfills/wraps the real [WebMCP spec surface](https://webmachinelearning.github.io/webmcp/),
+It's a common assumption that a package like this would register tools on something like `window.mcp`.
+It doesn't: `@mcp-b/global` polyfills/wraps the real [WebMCP spec surface](https://webmachinelearning.github.io/webmcp/),
 `document.modelContext`. Tools are registered with:
 
 ```js
@@ -45,6 +45,8 @@ ask-my-site/
 ```
 
 ## Setup
+
+Requires Node 20+ (a dependency of `@mcp-b/global` requires it).
 
 ```bash
 npm install
