@@ -61,10 +61,8 @@ if (import.meta.env.DEV) {
   // Dev-only test hook (not present in a production build) so the chat
   // agent loop's tool_use -> execute -> tool_result wiring, and its error
   // classification, can be exercised against a mocked API response, without
-  // a real Anthropic key. See README.
-  Promise.all([import('./chat/agent.js'), import('@anthropic-ai/sdk')]).then(
-    ([{ runAgentTurn, ChatError }, { default: Anthropic }]) => {
-      window.__chatDevHooks = { runAgentTurn, ChatError, Anthropic };
-    }
-  );
+  // a real Anthropic key or a running proxy. See README.
+  import('./chat/agent.js').then(({ runAgentTurn, ChatError }) => {
+    window.__chatDevHooks = { runAgentTurn, ChatError };
+  });
 }

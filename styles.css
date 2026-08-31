@@ -185,8 +185,8 @@ body {
 }
 
 .chat-warning {
-  background: rgba(226, 104, 90, 0.1);
-  border: 1px solid rgba(226, 104, 90, 0.35);
+  background: rgba(110, 168, 255, 0.08);
+  border: 1px solid rgba(110, 168, 255, 0.3);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 0.82rem;
@@ -195,7 +195,7 @@ body {
 }
 
 .chat-warning code {
-  color: var(--err);
+  color: var(--accent);
 }
 
 .chat-key-row {
@@ -206,26 +206,6 @@ body {
   margin-bottom: 8px;
 }
 
-.chat-key-row input[type='password'] {
-  flex: 1 1 260px;
-  background: #12141a;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  padding: 8px 10px;
-  font-size: 0.85rem;
-}
-
-.remember-label {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 0.78rem;
-  color: var(--muted);
-  white-space: nowrap;
-}
-
-.chat-key-row button,
 .chat-key-row select {
   background: #1d212b;
   border: 1px solid var(--border);
@@ -234,10 +214,6 @@ body {
   padding: 7px 12px;
   font-size: 0.82rem;
   cursor: pointer;
-}
-
-.chat-key-row button:hover {
-  filter: brightness(1.15);
 }
 
 .chat-key-status {
@@ -334,8 +310,7 @@ body {
   font-size: 0.85rem;
 }
 
-.chat-input-row button:disabled,
-.chat-key-row button:disabled {
+.chat-input-row button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }

@@ -1,5 +1,5 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { callRegisteredTool, getAnthropicTools } from '../webmcp/execute.js';
+import { ChatError, createMessageViaProxy } from './proxy-client.js';
 
 export const MODELS = [
   { id: 'claude-sonnet-5', label: 'Claude Sonnet 5' },
@@ -11,45 +11,7 @@ export const DEFAULT_MODEL = 'claude-sonnet-5';
 
 const MAX_TOOL_ITERATIONS = 8;
 
-export function createClient(apiKey) {
-  return new Anthropic({
-    apiKey,
-    // Demo-only: this exposes the key to page JS. See README "Security note".
-    // Also causes the SDK to send `anthropic-dangerous-direct-browser-access: true`,
-    // which the API requires for any browser-origin request.
-    dangerouslyAllowBrowser: true,
-  });
-}
-
-export class ChatError extends Error {
-  constructor(kind, message) {
-    super(message);
-    this.name = 'ChatError';
-    this.kind = kind; // 'auth' | 'rate_limit' | 'network' | 'api' | 'unknown'
-  }
-}
-
-function classifyError(err) {
-  if (err instanceof Anthropic.AuthenticationError) {
-    return new ChatError(
-      'auth',
-      'Invalid or unauthorized API key (401). Check the key and try again.'
-    );
-  }
-  if (err instanceof Anthropic.RateLimitError) {
-    return new ChatError(
-      'rate_limit',
-      'Rate limited by the Anthropic API (429). Wait a moment and retry.'
-    );
-  }
-  if (err instanceof Anthropic.APIConnectionError) {
-    return new ChatError('network', `Network error reaching the Anthropic API: ${err.message}`);
-  }
-  if (err instanceof Anthropic.APIError) {
-    return new ChatError('api', `Anthropic API error (${err.status ?? '?'}): ${err.message}`);
-  }
-  return new ChatError('unknown', err instanceof Error ? err.message : String(err));
-}
+export { ChatError };
 
 /**
  * Runs one user turn to completion against the live WebMCP tool registry:
@@ -59,17 +21,21 @@ function classifyError(err) {
  * until Claude returns a non-tool_use stop reason. Only custom tools are in
  * play here (no server tools), so any non-"tool_use" stop reason ends the turn.
  *
+ * The model call itself goes through the local backend proxy
+ * (`createMessageViaProxy`, POST /api/chat) rather than an in-browser
+ * Anthropic client — the API key lives server-side only. Tool execution
+ * stays client-side, because the tools act on live page DOM/state.
+ *
  * `createMessage`, `getTools`, and `executeTool` are injectable so the loop
  * can be exercised against a mocked API response without a real key/network
  * call — see the dev-only hook wired in main.js.
  */
 export async function runAgentTurn({
-  client,
   model,
   history,
   userText,
   onEvent = () => {},
-  createMessage = (params) => client.messages.create(params),
+  createMessage = createMessageViaProxy,
   getTools = getAnthropicTools,
   executeTool = callRegisteredTool,
 }) {
@@ -81,7 +47,9 @@ export async function runAgentTurn({
     try {
       response = await createMessage({ model, max_tokens: 16000, tools, messages });
     } catch (err) {
-      throw classifyError(err);
+      throw err instanceof ChatError
+        ? err
+        : new ChatError('unknown', err instanceof Error ? err.message : String(err));
     }
 
     messages.push({ role: 'assistant', content: response.content });

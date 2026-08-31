@@ -1,28 +1,11 @@
-import { clearApiKey, getApiKey, hasApiKey, restoreRememberedKey, setApiKey } from '../chat/api-key.js';
-import { createClient, runAgentTurn, ChatError } from '../chat/agent.js';
+import { runAgentTurn, ChatError } from '../chat/agent.js';
+import { fetchProxyStatus } from '../chat/proxy-client.js';
 import { getAnthropicTools } from '../webmcp/execute.js';
-import { toolsReady } from '../webmcp/tools.js';
 
 const entries = []; // { type: 'user' | 'assistant' | 'tool_call' | 'tool_result' | 'error', ... }
 let history = []; // Anthropic message history for this conversation
-let client = null;
-let clientKey = null; // the api key `client` was built from, so a key change rebuilds it
 let sending = false;
-
-function getClient() {
-  const key = getApiKey();
-  if (!client || clientKey !== key) {
-    client = createClient(key);
-    clientKey = key;
-  }
-  return client;
-}
-
-function renderKeyStatus(els) {
-  els.status.textContent = hasApiKey()
-    ? 'Key set (kept in memory for this page load only, unless "remember" is checked).'
-    : 'No key set — paste an Anthropic API key above to start chatting.';
-}
+let proxyConfigured = false;
 
 function renderEntries(els) {
   if (entries.length === 0) {
@@ -60,7 +43,6 @@ function toolResultText(result) {
 
 async function renderToolsNote(els) {
   try {
-    await toolsReady;
     const tools = await getAnthropicTools();
     els.toolsNote.textContent = tools.length
       ? `Tools visible to the agent (live from document.modelContext.getTools()): ${tools.map((t) => t.name).join(', ')}`
@@ -70,19 +52,30 @@ async function renderToolsNote(els) {
   }
 }
 
+async function refreshProxyStatus(els) {
+  const status = await fetchProxyStatus();
+  proxyConfigured = Boolean(status.configured);
+  if (status.unreachable) {
+    els.status.textContent =
+      '⚠️ Could not reach the local dev-server proxy. Is `npm run dev` running?';
+  } else if (!proxyConfigured) {
+    els.status.textContent =
+      '⚠️ Server is missing ANTHROPIC_API_KEY — copy .env.example to .env, add your key, and restart the dev server.';
+  } else {
+    els.status.textContent = 'Chat is ready — model calls go through the local dev-server proxy.';
+  }
+  setSending(els, sending);
+}
+
 function setSending(els, isSending) {
   sending = isSending;
   els.input.disabled = isSending;
-  els.send.disabled = isSending || !hasApiKey();
+  els.send.disabled = isSending || !proxyConfigured;
 }
 
 export function initChatPanel() {
   const els = {
-    keyInput: document.getElementById('chat-api-key'),
-    remember: document.getElementById('chat-remember'),
-    setKeyBtn: document.getElementById('chat-set-key'),
-    clearKeyBtn: document.getElementById('chat-clear-key'),
-    status: document.getElementById('chat-key-status'),
+    status: document.getElementById('chat-proxy-status'),
     model: document.getElementById('chat-model'),
     messages: document.getElementById('chat-messages'),
     form: document.getElementById('chat-form'),
@@ -91,39 +84,17 @@ export function initChatPanel() {
     toolsNote: document.getElementById('chat-tools-note'),
   };
 
-  if (restoreRememberedKey()) {
-    els.remember.checked = true;
-  }
-  renderKeyStatus(els);
   renderEntries(els);
   setSending(els, false);
+  refreshProxyStatus(els);
   renderToolsNote(els);
-
-  els.setKeyBtn.addEventListener('click', () => {
-    const value = els.keyInput.value;
-    setApiKey(value, { remember: els.remember.checked });
-    els.keyInput.value = '';
-    client = null; // force rebuild against the new key
-    renderKeyStatus(els);
-    setSending(els, sending);
-  });
-
-  els.clearKeyBtn.addEventListener('click', () => {
-    clearApiKey();
-    els.keyInput.value = '';
-    els.remember.checked = false;
-    client = null;
-    renderKeyStatus(els);
-    setSending(els, sending);
-  });
 
   els.form.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (sending) return;
-    if (!hasApiKey()) {
-      entries.push({ type: 'error', text: 'Set an API key above before chatting.' });
-      renderEntries(els);
-      return;
+    if (!proxyConfigured) {
+      await refreshProxyStatus(els); // pick up a .env added after page load
+      if (!proxyConfigured) return;
     }
     const text = els.input.value.trim();
     if (!text) return;
@@ -135,7 +106,6 @@ export function initChatPanel() {
 
     try {
       const result = await runAgentTurn({
-        client: getClient(),
         model: els.model.value,
         history,
         userText: text,
