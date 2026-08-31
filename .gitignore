@@ -2,10 +2,9 @@ node_modules
 dist
 dist-ssr
 
-# env / secrets
+# env / secrets (unused by this app, kept as a default precaution)
 .env
 .env.*
-!.env.example
 
 # logs
 *.log

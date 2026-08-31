@@ -38,17 +38,3 @@ export async function callRegisteredTool(toolName, args) {
     return { content: [{ type: 'text', text: message }], isError: true };
   }
 }
-
-/** Tool descriptors from the live registry, mapped to Anthropic's tool-definition shape. */
-export async function getAnthropicTools() {
-  await toolsReady;
-  const tools = await document.modelContext.getTools();
-  return tools.map((t) => ({
-    name: t.name,
-    description: t.description,
-    input_schema:
-      typeof t.inputSchema === 'string'
-        ? JSON.parse(t.inputSchema)
-        : (t.inputSchema ?? { type: 'object', properties: {} }),
-  }));
-}

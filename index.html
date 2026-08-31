@@ -3,95 +3,76 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Ask My Site — WebMCP demo</title>
+    <title>Prop Vault — Screen-Worn Collectibles</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,500&family=JetBrains+Mono:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <header class="site-header">
-      <h1>Ask My Site</h1>
-      <p class="subtitle">
-        A tiny storefront that exposes <code>search_products</code>, <code>add_to_cart</code>, and
-        <code>apply_discount_code</code> as <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener">WebMCP</a>
-        tools via <code>document.modelContext</code>.
-      </p>
-      <p class="status" id="mcp-status">Checking WebMCP availability&hellip;</p>
-    </header>
+    <div class="page">
+      <header class="site-header">
+        <nav class="nav">
+          <a class="brand" href="#top">
+            <span class="brand-mark" aria-hidden="true">PV</span>
+            <span class="brand-name">Prop&nbsp;Vault</span>
+          </a>
+          <a class="cart-link" id="cart-link" href="#cart-panel">
+            Cart
+            <span class="cart-count" id="cart-count" hidden>0</span>
+          </a>
+        </nav>
+      </header>
 
-    <main class="layout">
-      <section class="panel catalog-panel">
-        <h2>Catalog</h2>
-        <div id="catalog"></div>
+      <section class="hero" id="top">
+        <div class="hero-copy">
+          <p class="eyebrow">Curated for collectors</p>
+          <h1>Screen-worn props.<br />Shelf-ready chaos.</h1>
+          <p class="hero-sub">
+            <span id="hero-count">1,018</span> legendary, rare, and common artifacts pulled from the
+            multiverse of cinema — every piece catalogued, tiered by rarity, and ready to add to your
+            collection.
+          </p>
+          <div class="hero-actions">
+            <a class="hero-cta" href="#catalog-panel">Browse the collection</a>
+            <p class="trust-badge">★ 4.9 rating across 12,842 collector reviews</p>
+          </div>
+        </div>
       </section>
 
-      <aside class="panel cart-panel">
-        <h2>Cart</h2>
-        <div id="cart"></div>
-      </aside>
-    </main>
+      <main class="layout">
+        <section class="panel catalog-panel" id="catalog-panel">
+          <div class="toolbar">
+            <input
+              type="search"
+              id="catalog-search"
+              class="catalog-search"
+              placeholder="Search the vault… try “cape” or “blade”"
+              autocomplete="off"
+            />
+            <div class="chips" id="category-filters"></div>
+          </div>
+          <div id="catalog"></div>
+        </section>
 
-    <section class="panel chat-panel">
-      <h2>Chat with an agent</h2>
-      <p class="chat-warning">
-        The model call is relayed through a small backend proxy (<code>server/anthropic-proxy.js</code>,
-        mounted at <code>POST /api/chat</code>) that reads <code>ANTHROPIC_API_KEY</code> from the
-        server's environment — the key never reaches this page or your browser. See the README for
-        setup and for what's still missing before this would be production-ready.
-      </p>
-      <div class="chat-key-row">
-        <select id="chat-model">
-          <option value="claude-sonnet-5" selected>Claude Sonnet 5</option>
-          <option value="claude-opus-5">Claude Opus 5</option>
-          <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
-        </select>
-      </div>
-      <p class="chat-key-status" id="chat-proxy-status">Checking the proxy&hellip;</p>
-      <p class="chat-tools-note" id="chat-tools-note">Reading registered tools&hellip;</p>
-      <div class="chat-messages" id="chat-messages">
-        <p class="empty">No messages yet.</p>
-      </div>
-      <form id="chat-form" class="chat-input-row">
-        <input
-          type="text"
-          id="chat-input"
-          placeholder="Ask the agent to search products, add to cart, or apply a discount…"
-          autocomplete="off"
-        />
-        <button type="submit" id="chat-send">Send</button>
-      </form>
-    </section>
+        <aside class="panel cart-panel" id="cart-panel">
+          <h2>Your cart</h2>
+          <div id="cart"></div>
+        </aside>
+      </main>
 
-    <section class="panel dev-panel">
-      <h2>Dev Console <span class="hint">(calls the exact registered WebMCP tools — no Chrome flag required)</span></h2>
-      <div class="dev-forms">
-        <form id="form-search" class="dev-form">
-          <label>search_products
-            <input type="text" name="query" placeholder="query, e.g. coffee" required />
-          </label>
-          <button type="submit">Run</button>
-        </form>
-        <form id="form-add" class="dev-form">
-          <label>add_to_cart
-            <input type="text" name="product_id" placeholder="product_id, e.g. p1" required />
-          </label>
-          <label>qty
-            <input type="number" name="quantity" min="1" value="1" />
-          </label>
-          <button type="submit">Run</button>
-        </form>
-        <form id="form-discount" class="dev-form">
-          <label>apply_discount_code
-            <input type="text" name="code" placeholder="code, e.g. SAVE10" required />
-          </label>
-          <button type="submit">Run</button>
-        </form>
-      </div>
-      <pre id="dev-output" class="dev-output">Results of dev-console tool calls appear here.</pre>
-    </section>
-
-    <section class="panel log-panel">
-      <h2>Agent Activity Log</h2>
-      <div id="activity-log"></div>
-    </section>
+      <footer class="site-footer">
+        <p>
+          <strong>Prop Vault</strong> is a fictional collector's shop. Every item is an original,
+          parody-inspired prop; the "Inspired by" line on each card names the film it riffs on purely
+          for reference. Nothing here is officially licensed or endorsed by, or affiliated with, any
+          studio, franchise, or rights holder. Nothing is for sale. Nothing ships.
+        </p>
+      </footer>
+    </div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

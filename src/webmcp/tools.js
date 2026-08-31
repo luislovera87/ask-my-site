@@ -22,7 +22,8 @@ async function withLogging(name, args, run) {
 async function registerTools() {
   await document.modelContext.registerTool({
     name: 'search_products',
-    description: 'Search the product catalog by name or tag',
+    description:
+      'Search the product catalog (1000+ items) by name or tag. Returns at most 20 matches — narrow the query if you need a specific item.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -32,11 +33,16 @@ async function registerTools() {
     },
     async execute(args) {
       return withLogging('search_products', args, () => {
-        const matches = searchProducts(args.query);
+        const MAX_RESULTS = 20;
+        const allMatches = searchProducts(args.query);
+        const matches = allMatches.slice(0, MAX_RESULTS);
+        const extra = allMatches.length - matches.length;
         return {
           payload: matches,
           text: matches.length
-            ? `Found ${matches.length} product(s): ${matches.map((p) => p.name).join(', ')}`
+            ? `Found ${allMatches.length} product(s), showing ${matches.length}: ${matches
+                .map((p) => `${p.name} (id: ${p.id}, $${p.price.toFixed(2)})`)
+                .join(', ')}${extra > 0 ? ` (+${extra} more — narrow the query to see them)` : ''}`
             : `No products matched "${args.query}"`,
         };
       });

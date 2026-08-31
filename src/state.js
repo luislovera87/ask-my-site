@@ -46,6 +46,25 @@ export function addToCart(productId, quantity) {
   return { product, quantity: qty };
 }
 
+export function removeFromCart(productId) {
+  const idx = state.cart.findIndex((item) => item.productId === productId);
+  if (idx === -1) return;
+  state.cart.splice(idx, 1);
+  notify();
+}
+
+export function setCartQuantity(productId, quantity) {
+  const item = state.cart.find((i) => i.productId === productId);
+  if (!item) return;
+  const qty = Math.floor(quantity);
+  if (qty <= 0) {
+    removeFromCart(productId);
+    return;
+  }
+  item.quantity = qty;
+  notify();
+}
+
 export function applyDiscount(code) {
   const normalized = (code ?? '').trim().toUpperCase();
   if (normalized === 'SAVE10') {

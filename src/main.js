@@ -1,68 +1,80 @@
 import { toolsReady } from './webmcp/tools.js';
-import { callRegisteredTool } from './webmcp/execute.js';
-import { subscribe } from './state.js';
-import { renderCatalog } from './ui/catalog.js';
+import { subscribe, getState } from './state.js';
+import { renderCatalog, CATEGORIES, CATEGORY_LABEL_MAP, PAGE_SIZE } from './ui/catalog.js';
 import { renderCart } from './ui/cart.js';
-import { renderActivityLog } from './ui/activity-log.js';
-import { initChatPanel } from './ui/chat-panel.js';
+import { products } from './data/products.js';
 
 const catalogEl = document.getElementById('catalog');
 const cartEl = document.getElementById('cart');
-const logEl = document.getElementById('activity-log');
-const statusEl = document.getElementById('mcp-status');
+const cartCountEl = document.getElementById('cart-count');
+const searchInput = document.getElementById('catalog-search');
+const filterBar = document.getElementById('category-filters');
+const heroCountEl = document.getElementById('hero-count');
+
+const filterState = { query: '', category: 'all', visibleCount: PAGE_SIZE };
+
+function renderCatalogWithFilters() {
+  renderCatalog(catalogEl, {
+    ...filterState,
+    onLoadMore: () => {
+      filterState.visibleCount += PAGE_SIZE;
+      renderCatalogWithFilters();
+    },
+  });
+}
+
+if (heroCountEl) {
+  heroCountEl.textContent = products.length.toLocaleString('en-US');
+}
+
+function renderCartCount() {
+  const count = getState().cart.reduce((sum, item) => sum + item.quantity, 0);
+  cartCountEl.textContent = String(count);
+  cartCountEl.hidden = count === 0;
+}
 
 function renderAll() {
   renderCart(cartEl);
-  renderActivityLog(logEl);
+  renderCartCount();
 }
 
-renderCatalog(catalogEl);
+renderCatalogWithFilters();
 renderAll();
 subscribe(renderAll);
 
-toolsReady
-  .then(async () => {
-    const tools = await document.modelContext.getTools();
-    statusEl.textContent = `${tools.length} WebMCP tools registered on document.modelContext: ${tools
-      .map((t) => t.name)
-      .join(', ')}`;
-  })
-  .catch((err) => {
-    statusEl.textContent = `Failed to register WebMCP tools: ${err.message}`;
-  });
+// Tools register silently in the background — see src/webmcp/tools.js.
+// Nothing about this is surfaced in the UI; the page reads as a plain storefront.
+toolsReady.catch((err) => {
+  console.error('Failed to register WebMCP tools:', err);
+});
 
-function wireDevForm(formId, buildArgs) {
-  const form = document.getElementById(formId);
-  const output = document.getElementById('dev-output');
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const data = new FormData(form);
-    const args = buildArgs(data);
-    const toolName = form.dataset.tool ?? form.id.replace('form-', '');
-    const result = await callRegisteredTool(toolName, args);
-    output.textContent = `${toolName}(${JSON.stringify(args)}) ->\n${JSON.stringify(result, null, 2)}`;
-  });
-}
+searchInput.addEventListener('input', () => {
+  filterState.query = searchInput.value;
+  filterState.visibleCount = PAGE_SIZE;
+  renderCatalogWithFilters();
+});
 
-document.getElementById('form-search').dataset.tool = 'search_products';
-document.getElementById('form-add').dataset.tool = 'add_to_cart';
-document.getElementById('form-discount').dataset.tool = 'apply_discount_code';
+filterBar.innerHTML = ['all', ...CATEGORIES]
+  .map(
+    (cat) =>
+      `<button type="button" class="chip ${cat === 'all' ? 'chip-active' : ''}" data-category="${cat}">${
+        cat === 'all' ? 'All' : CATEGORY_LABEL_MAP[cat]
+      }</button>`
+  )
+  .join('');
 
-wireDevForm('form-search', (data) => ({ query: data.get('query') }));
-wireDevForm('form-add', (data) => ({
-  product_id: data.get('product_id'),
-  quantity: Number(data.get('quantity')) || 1,
-}));
-wireDevForm('form-discount', (data) => ({ code: data.get('code') }));
+filterBar.addEventListener('click', (event) => {
+  const btn = event.target.closest('[data-category]');
+  if (!btn) return;
+  filterState.category = btn.dataset.category;
+  filterState.visibleCount = PAGE_SIZE;
+  filterBar
+    .querySelectorAll('.chip')
+    .forEach((chip) => chip.classList.toggle('chip-active', chip === btn));
+  renderCatalogWithFilters();
+});
 
-initChatPanel();
-
-if (import.meta.env.DEV) {
-  // Dev-only test hook (not present in a production build) so the chat
-  // agent loop's tool_use -> execute -> tool_result wiring, and its error
-  // classification, can be exercised against a mocked API response, without
-  // a real Anthropic key or a running proxy. See README.
-  import('./chat/agent.js').then(({ runAgentTurn, ChatError }) => {
-    window.__chatDevHooks = { runAgentTurn, ChatError };
-  });
-}
+document.getElementById('cart-link').addEventListener('click', (event) => {
+  event.preventDefault();
+  document.getElementById('cart-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});

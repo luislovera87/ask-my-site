@@ -1,30 +1,18 @@
-# Ask My Site
+# Prop Vault
 
-A tiny Vite + vanilla JS storefront that demonstrates [WebMCP](https://webmachinelearning.github.io/webmcp/):
-it registers three tools on `document.modelContext` using [`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global),
-so an AI agent (or any WebMCP client) can search products, add items to the cart, and apply a discount
-code — with every call visibly mutating shared page state and logged in an on-page activity panel.
+A fully static, vanilla-JS e-commerce demo — a fictional shop selling 1,018 parody-inspired movie
+props (capes, blasters, helmets, a car or two) — that also happens to publish
+[WebMCP](https://webmachinelearning.github.io/webmcp/) tools on `document.modelContext` via
+[`@mcp-b/global`](https://www.npmjs.com/package/@mcp-b/global): `search_products`, `add_to_cart`,
+and `apply_discount_code`.
 
-## Note on the `@mcp-b/global` API
-
-It's a common assumption that a package like this would register tools on something like `window.mcp`.
-It doesn't: `@mcp-b/global` polyfills/wraps the real [WebMCP spec surface](https://webmachinelearning.github.io/webmcp/),
-`document.modelContext`. Tools are registered with:
-
-```js
-import '@mcp-b/global';
-
-await document.modelContext.registerTool({
-  name: 'my_tool',
-  description: '...',
-  inputSchema: { type: 'object', properties: { ... } },
-  async execute(args) {
-    return { content: [{ type: 'text', text: '...' }] };
-  },
-});
-```
-
-This app follows the real API — see `src/webmcp/tools.js`.
+**The page itself never mentions WebMCP, MCP, or "agents" anywhere** — that's deliberate. The whole
+point of WebMCP is that a site *publishes* tools; the agent that discovers and calls them (Claude,
+ChatGPT, a browser extension) is expected to live somewhere else entirely, not be advertised on the
+page. So this reads as a completely ordinary storefront to a human visitor — hero, search, category
+filters, real "Add to cart" buttons, an interactive cart with quantity steppers and a discount code —
+while the tools quietly exist underneath for anything that knows to look for them via
+`document.modelContext.getTools()`.
 
 ## Project structure
 
@@ -33,21 +21,14 @@ ask-my-site/
 ├── index.html
 ├── package.json
 ├── vite.config.js
-├── .env.example              # copy to .env and fill in ANTHROPIC_API_KEY
-├── server/
-│   └── anthropic-proxy.js    # Vite dev/preview-server plugin: holds the key, relays POST /api/chat
 ├── src/
-│   ├── main.js                # wires state + UI + tool registration together
-│   ├── data/products.js       # 8 hardcoded products
-│   ├── webmcp/tools.js        # registers search_products, add_to_cart, apply_discount_code
-│   ├── webmcp/execute.js      # shared "call the real registered tool" + tool-schema helper
-│   ├── chat/proxy-client.js   # fetch('/api/chat') + error classification (no key, no SDK client)
-│   ├── chat/agent.js          # the tool_use -> execute -> tool_result loop
-│   ├── ui/catalog.js          # product grid
-│   ├── ui/cart.js             # cart + totals, re-renders on state change
-│   ├── ui/activity-log.js     # "Agent Activity Log" panel
-│   ├── ui/chat-panel.js       # chat UI: model select, message list, proxy status
-│   └── state.js               # shared in-memory store (cart, discount, activity log) + pub/sub
+│   ├── main.js               # wires state + UI + tool registration together
+│   ├── data/products.js      # 18 hand-written products + a deterministic generator for 1,000 more
+│   ├── webmcp/tools.js       # registers search_products, add_to_cart, apply_discount_code
+│   ├── webmcp/execute.js     # "call the real registered tool" helper
+│   ├── ui/catalog.js         # product grid, category icons, rarity badges, search/filter, pagination
+│   ├── ui/cart.js            # interactive cart: qty steppers, remove, discount code, totals
+│   └── state.js              # shared in-memory store (cart, discount) + pub/sub
 └── styles.css
 ```
 
@@ -57,124 +38,83 @@ Requires Node 20+ (a dependency of `@mcp-b/global` requires it).
 
 ```bash
 npm install
-cp .env.example .env    # then edit .env and set ANTHROPIC_API_KEY=sk-ant-...
 npm run dev
 ```
 
-Open the printed local URL (defaults to `http://localhost:5173`). The catalog, cart, Dev Console, and
-Activity Log all work with no key at all — only the chat panel needs `ANTHROPIC_API_KEY` set.
+Open the printed local URL (defaults to `http://localhost:5173`). Everything works immediately — no
+`.env`, no key, no server to configure. It's a static site: `npm run build` produces a `dist/` folder
+you can host anywhere, including GitHub Pages.
+
+## The catalog
+
+18 items are hand-written (`curated` in `src/data/products.js`) with real care put into their names,
+descriptions, and the film each riffs on. The other 1,000 are generated deterministically at module
+load from word banks (adjectives × category nouns × franchises × a rarity table weighted toward
+common/rare) — same catalog on every load, not random, so search results and product IDs are stable
+across reloads. Every product has a `tag` (category), a `rarity` (`common` / `rare` / `legendary`),
+and an `inspiredBy` franchise line shown on its card.
+
+The catalog panel paginates (24 at a time, "Load more") rather than rendering all 1,018 cards at once —
+necessary at this scale, and also just normal e-commerce UX.
+
+**Every item is an original, parody-inspired prop.** The "Inspired by" line names the film purely for
+reference — nothing here is officially licensed, endorsed by, or affiliated with any studio or rights
+holder, nothing is for sale, nothing ships. See the footer disclaimer on the page itself.
 
 ## The three WebMCP tools
 
 | Tool | Args | Behavior |
 | --- | --- | --- |
-| `search_products` | `{ query: string }` | Matches product name or tag (case-insensitive substring) |
+| `search_products` | `{ query: string }` | Matches product name or tag (case-insensitive substring); returns at most 20 results with a "+N more" note so a 1,018-item catalog never floods an agent's context |
 | `add_to_cart` | `{ product_id: string, quantity?: number }` | Adds/increments a cart line; throws (→ tool error) if `product_id` doesn't exist |
 | `apply_discount_code` | `{ code: string }` | Applies 10% off if `code === "SAVE10"` (case-insensitive); otherwise returns a tool error and leaves the cart untouched |
 
-Every call — success or failure — is appended to the **Agent Activity Log** panel with a timestamp, the
-tool name, the raw arguments, and the result (or error message).
+These are the same three tools whether they're called by a human clicking "Add to cart," the browser
+console, or a real agent — `src/webmcp/execute.js` is the one code path everything goes through
+(`document.modelContext.executeTool` behind the WebMCP flag, `navigator.modelContextTesting.executeTool`
+otherwise), so nothing about the demo is a shortcut around the actual registered tool.
 
-## Testing without the Chrome WebMCP flag
+## Testing the tools without the Chrome WebMCP flag
 
-`@mcp-b/global` also installs `navigator.modelContextTesting`, a testing shim that mirrors whatever is
-registered on `document.modelContext`. This app uses it to power a **Dev Console** panel on the page
-itself (below the catalog/cart), with a small form per tool. Submitting a form calls:
+There's no in-page dev console anymore (removed on purpose — see "why the page hides WebMCP" above).
+To exercise a tool directly, open the browser console and call the testing shim
+`@mcp-b/global` installs:
 
 ```js
-await navigator.modelContextTesting.executeTool(toolName, JSON.stringify(args));
+const result = await navigator.modelContextTesting.executeTool('search_products', JSON.stringify({ query: 'blade' }));
+JSON.parse(result);
 ```
 
-This exercises the *exact same* registered tool — schema, `execute()` handler, state mutation, and
-activity logging — as a real agent would, so you can verify the whole flow with zero browser flags.
-Try:
+This runs through the exact same registered tool — schema, `execute()` handler, state mutation — as a
+real agent would.
 
-- `search_products` with `query = "coffee"`
-- `add_to_cart` with `product_id = "p2"`, `quantity = 2`
-- `apply_discount_code` with `code = "NOPE"` (should log an error and leave totals unchanged)
-- `apply_discount_code` with `code = "SAVE10"` (should apply 10% off)
+## Testing with native Chrome WebMCP support (DevTools panel + real agents)
 
-## Testing with a real WebMCP agent in Chrome
+By default `@mcp-b/global` runs its own JS polyfill — invisible to Chrome's own tooling, so you won't
+see anything under DevTools → Application → WebMCP, or find the site from a WebMCP-aware browser
+extension, until you turn on Chrome's native implementation:
 
-To have an actual AI agent extension discover and call these tools via the native browser API instead
-of the polyfill:
+1. Go to `chrome://flags/#enable-webmcp-testing`, enable it, and relaunch Chrome (Chrome 149+; this is
+   an active origin trial, so the exact flag may move — search `chrome://flags` for "WebMCP" if that
+   link 404s).
+2. Reload the app. `@mcp-b/global` auto-detects native support and wraps the real
+   `document.modelContext` instead of its polyfill — no code change needed on our end.
+3. Open DevTools → **Application → WebMCP**. The "Available Tools" pane should list
+   `search_products`, `add_to_cart`, and `apply_discount_code`; "Invoked Tools" logs each call an agent
+   makes, live.
+4. A WebMCP-aware agent/extension connected to the tab will see the same three tools via `getTools()`
+   and can call them directly — you'll see the catalog/cart update live in the page.
 
-1. Use a recent Chromium build (Chrome or Edge) that ships the WebMCP origin trial / experimental flag.
-2. Go to `chrome://flags`, search for **"WebMCP"** (may appear as "Enable WebMCP API" or similar —
-   naming has shifted across Chrome versions since this is an active spec), enable it, and relaunch
-   the browser.
-3. Confirm activation: open DevTools console on the running app and check
-   `'modelContext' in document` and `document.modelContext.executeTool`. If `executeTool` exists as a
-   function, the native implementation is active (not just the polyfill).
-4. With the app open at `http://localhost:5173`, connect a WebMCP-aware agent/extension to the tab. It
-   will see `search_products`, `add_to_cart`, and `apply_discount_code` via `getTools()` and can call
-   them directly — you should see the catalog/cart/log update live in the page, exactly as the Dev
-   Console does.
-
-If the flag isn't available in your Chrome build yet, the Dev Console above is a faithful stand-in:
-it goes through the same `registerTool`/`execute` code path, just invoked via the testing shim instead
-of a native agent connection.
-
-## Chat with a real agent
-
-Below the catalog/cart is a chat panel where an actual Claude model does the tool selection — not a
-scripted demo. Set `ANTHROPIC_API_KEY` in `.env` (see Setup above) and ask it things like "search for
-coffee gear", "add the notebook to my cart", or "apply SAVE10". The key never reaches the browser —
-there's nothing to paste in the UI.
-
-How it works:
-
-1. On send, the page builds the tool list for the API call by calling
-   `document.modelContext.getTools()` **at that moment** — the same registry the catalog/cart/Dev
-   Console/native-agent paths all use. Nothing about the tool schemas is hand-duplicated; if you edit
-   `src/webmcp/tools.js`, the chat sees the change on the next message with no other code to update.
-2. The browser sends the tool list and conversation to `POST /api/chat` — a route on the same Vite dev
-   server, not to Anthropic directly. `server/anthropic-proxy.js` is a small Vite plugin (`configureServer`
-   / `configurePreviewServer` middleware) that reads `ANTHROPIC_API_KEY` server-side (via `loadEnv`, so
-   it works for a plain, non-`VITE_`-prefixed variable), attaches it as `x-api-key`, and forwards the
-   request to the real Anthropic Messages API, relaying the response back verbatim. It holds no
-   conversation state of its own — it's a pass-through relay, not a second copy of the agent loop.
-3. If the model responds with `tool_use`, **the browser** executes it through the exact same
-   registered-tool pipeline the Dev Console uses (`src/webmcp/execute.js` — prefers the native
-   `document.modelContext.executeTool` behind the WebMCP flag, falls back to
-   `navigator.modelContextTesting.executeTool` otherwise), feeds the `tool_result` back, and loops
-   until the model returns a final answer. Multiple tool calls in one turn are all executed and
-   returned together, per the API's parallel-tool-use contract. **Tool execution deliberately stays
-   client-side** — the tools act on live page DOM/state (the cart, the catalog) that only exists in the
-   browser, so moving execution to the server would mean the server driving a browser it doesn't have.
-4. Every one of those tool calls lands in the Agent Activity Log automatically, because step 3 runs
-   through each tool's real `execute()` handler — the same one wired up in `webmcp/tools.js` — not a
-   shortcut.
-
-So the split is: **model call** goes through the server (key stays there); **tool execution** stays in
-the browser (state stays there). The agentic loop itself — deciding when to call the model again after
-a tool result — also stays client-side, since it's just orchestrating those two things.
-
-### Why a backend, and what's still missing for production
-
-Keeping `ANTHROPIC_API_KEY` server-side means page JavaScript, browser extensions, and anyone poking at
-dev tools can no longer read it out of the page — that's the entire reason for this shape, and it's a
-real improvement over an in-browser key. But **`/api/chat` itself has no authentication, no rate
-limiting, and no per-user quota.** As shipped, anyone who can reach this dev server (anyone on your
-LAN if it's exposed, anyone with the URL if it's deployed as-is) can call `/api/chat` freely and spend
-your Anthropic quota — the key is off the page, but the endpoint that holds it is still wide open. A
-real deployment would need, at minimum: authenticating callers of `/api/chat` (session/cookie, a
-per-user token, or similar), rate limiting per caller, and probably request/response logging for abuse
-review. None of that is implemented here — this is still a local, single-developer demo, just one
-where the credential-handling mistake ("key in the browser") is fixed and the remaining-work list is
-now about the proxy endpoint instead of the page.
+**If the panel still shows nothing** with the flag on: confirm `window.isSecureContext` is `true` in
+the console (WebMCP requires HTTPS or `localhost`) and that you actually reloaded after flipping the
+flag. There's no reliable way to detect native-vs-polyfill from page JS alone —
+`document.modelContext.executeTool` exists on both, so don't use it as a signal.
 
 ## Notes
 
-- State (`src/state.js`) is a single in-memory object with a tiny pub/sub. All three tools — the Dev
-  Console, and the chat agent loop — mutate it through the same functions the UI reads, so calling a
-  tool updates the DOM reactively with no page reload.
-- Refreshing the page resets the cart/discount/log/chat history (in-memory only, no persistence), by
-  design for a demo.
-- If `ANTHROPIC_API_KEY` isn't set, the chat panel shows a clear status message (not a stack trace) and
-  disables the Send button — the proxy also refuses `POST /api/chat` with a `503` and an explicit
-  `missing_api_key` error type in that case.
-- In dev mode (`npm run dev`), `window.__chatDevHooks` exposes the agent loop and its error type — used
-  to exercise the `tool_use` → execute → `tool_result` loop and the 401/429/missing-key/network error
-  paths against a mocked `createMessage`, without a real key or a running proxy. It's stripped from a
-  production build (`import.meta.env.DEV`-gated).
+- State (`src/state.js`) is a single in-memory object with a tiny pub/sub. The WebMCP tools and the
+  human-facing "Add to cart" / quantity / remove / discount controls all mutate it through the same
+  functions, so either path updates the DOM reactively with no page reload.
+- Refreshing the page resets the cart/discount (in-memory only, no persistence), by design for a demo.
+- No backend, no API key, no secrets anywhere in this repo — it deploys as-is to GitHub Pages or any
+  static host with no extra setup.
