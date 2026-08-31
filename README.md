@@ -37,9 +37,13 @@ ask-my-site/
 │   ├── main.js              # wires state + UI + tool registration together
 │   ├── data/products.js     # 8 hardcoded products
 │   ├── webmcp/tools.js      # registers search_products, add_to_cart, apply_discount_code
+│   ├── webmcp/execute.js    # shared "call the real registered tool" + tool-schema helper
+│   ├── chat/api-key.js      # in-memory (+ opt-in sessionStorage) API key handling
+│   ├── chat/agent.js        # Anthropic client + the tool_use -> execute -> tool_result loop
 │   ├── ui/catalog.js        # product grid
 │   ├── ui/cart.js           # cart + totals, re-renders on state change
 │   ├── ui/activity-log.js   # "Agent Activity Log" panel
+│   ├── ui/chat-panel.js     # chat UI: key entry, model select, message list
 │   └── state.js             # shared in-memory store (cart, discount, activity log) + pub/sub
 └── styles.css
 ```
@@ -106,10 +110,66 @@ If the flag isn't available in your Chrome build yet, the Dev Console above is a
 it goes through the same `registerTool`/`execute` code path, just invoked via the testing shim instead
 of a native agent connection.
 
+## Chat with a real agent
+
+Below the catalog/cart is a chat panel where an actual Claude model does the tool selection — not a
+scripted demo. Paste your own [Anthropic API key](https://platform.claude.com/) into the field there
+and ask it things like "search for coffee gear", "add the notebook to my cart", or "apply SAVE10".
+
+How it works:
+
+1. On send, the page builds the tool list for the API call by calling
+   `document.modelContext.getTools()` **at that moment** — the same registry the catalog/cart/Dev
+   Console/native-agent paths all use. Nothing about the tool schemas is hand-duplicated; if you edit
+   `src/webmcp/tools.js`, the chat sees the change on the next message with no other code to update.
+2. It calls the Anthropic Messages API (`client.messages.create`) with that tool list and the
+   conversation so far.
+3. If the model responds with `tool_use`, the page executes it through the exact same registered-tool
+   pipeline the Dev Console uses (`src/webmcp/execute.js` — prefers the native
+   `document.modelContext.executeTool` behind the WebMCP flag, falls back to
+   `navigator.modelContextTesting.executeTool` otherwise), feeds the `tool_result` back, and loops
+   until the model returns a final answer. Multiple tool calls in one turn are all executed and
+   returned together, per the API's parallel-tool-use contract.
+4. Every one of those tool calls lands in the Agent Activity Log automatically, because step 3 runs
+   through each tool's real `execute()` handler — the same one wired up in `webmcp/tools.js` — not a
+   shortcut.
+
+**Why this demo is shaped this way:** the point of WebMCP is that a website *publishes* tools; the
+agent (and its model, and its API key) is expected to live somewhere else entirely — a browser
+extension, a separate app, a server. This chat panel puts a model in the page itself only so you can
+see the whole loop working without installing a separate WebMCP client. It is a demonstration of the
+tool-calling contract, not a template for how a production chat feature should be built.
+
+### Security note — read this before pasting a real key
+
+This chat panel calls `api.anthropic.com` **directly from the browser**, using the SDK's
+`dangerouslyAllowBrowser: true` option (which is what makes the SDK send the
+`anthropic-dangerous-direct-browser-access: true` header the API requires for any browser-origin
+request). That means:
+
+- Your API key is held as a plain JS variable in page memory. Any script that runs on this page — a
+  browser extension, a dev-tools snippet, a future bug in this code — can read it.
+- **Default behavior:** the key lives in memory only and is gone on refresh. Checking "remember for
+  this tab only" also writes it to `sessionStorage` (cleared when the tab closes) — that's the only
+  persistence option, and it's opt-in. The key is **never** written to `localStorage`, never sent
+  anywhere except `api.anthropic.com`, and never committed to this repo.
+- Use the **"Clear key"** button to wipe it from memory and `sessionStorage` immediately.
+- **This pattern is fine for a local, single-user demo you run on your own machine and is not fine for
+  a real product.** For anything beyond a demo, put a small server (even a one-route Vite dev-server
+  proxy, or any tiny backend) between the browser and Anthropic, keep the key server-side in an
+  uncommitted `.env`, and have the browser call your server instead. We didn't build it that way here
+  specifically *because* the point of this feature is "paste a key, watch a real model call the page's
+  published tools" — a proxy would move the key off the page but also move the API call off the page,
+  which defeats the demo.
+
 ## Notes
 
-- State (`src/state.js`) is a single in-memory object with a tiny pub/sub. All three tools — and the
-  Dev Console — mutate it through the same functions the UI reads, so calling a tool updates the DOM
-  reactively with no page reload.
-- Refreshing the page resets the cart/discount/log (in-memory only, no persistence), by design for a
-  demo.
+- State (`src/state.js`) is a single in-memory object with a tiny pub/sub. All three tools — the Dev
+  Console, and the chat agent loop — mutate it through the same functions the UI reads, so calling a
+  tool updates the DOM reactively with no page reload.
+- Refreshing the page resets the cart/discount/log/chat history (in-memory only, no persistence), by
+  design for a demo.
+- In dev mode (`npm run dev`), `window.__chatDevHooks` exposes the agent loop, its error type, and the
+  Anthropic SDK export — used to exercise the `tool_use` → execute → `tool_result` loop and the
+  401/429/network error paths against mocked API responses, without a real key. It's stripped from a
+  production build (`import.meta.env.DEV`-gated).

@@ -29,6 +29,52 @@
       </aside>
     </main>
 
+    <section class="panel chat-panel">
+      <h2>Chat with an agent</h2>
+      <p class="chat-warning">
+        This calls <code>api.anthropic.com</code> directly from your browser
+        (<code>dangerouslyAllowBrowser</code>, which sends
+        <code>anthropic-dangerous-direct-browser-access: true</code>) — the key is only ever held in
+        this page's memory and sent straight to Anthropic. That's fine for a local, single-user demo,
+        but exposes the key to any page JavaScript; never ship this pattern to production — use a
+        server-side proxy instead. See the README for why.
+      </p>
+      <div class="chat-key-row">
+        <input
+          type="password"
+          id="chat-api-key"
+          placeholder="sk-ant-..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <label class="remember-label">
+          <input type="checkbox" id="chat-remember" />
+          remember for this tab only
+        </label>
+        <button type="button" id="chat-set-key">Use key</button>
+        <button type="button" id="chat-clear-key">Clear key</button>
+        <select id="chat-model">
+          <option value="claude-sonnet-5" selected>Claude Sonnet 5</option>
+          <option value="claude-opus-5">Claude Opus 5</option>
+          <option value="claude-haiku-4-5">Claude Haiku 4.5</option>
+        </select>
+      </div>
+      <p class="chat-key-status" id="chat-key-status">Checking for a remembered key&hellip;</p>
+      <p class="chat-tools-note" id="chat-tools-note">Reading registered tools&hellip;</p>
+      <div class="chat-messages" id="chat-messages">
+        <p class="empty">No messages yet.</p>
+      </div>
+      <form id="chat-form" class="chat-input-row">
+        <input
+          type="text"
+          id="chat-input"
+          placeholder="Ask the agent to search products, add to cart, or apply a discount…"
+          autocomplete="off"
+        />
+        <button type="submit" id="chat-send">Send</button>
+      </form>
+    </section>
+
     <section class="panel dev-panel">
       <h2>Dev Console <span class="hint">(calls the exact registered WebMCP tools — no Chrome flag required)</span></h2>
       <div class="dev-forms">

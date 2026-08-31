@@ -1,8 +1,10 @@
 import { toolsReady } from './webmcp/tools.js';
+import { callRegisteredTool } from './webmcp/execute.js';
 import { subscribe } from './state.js';
 import { renderCatalog } from './ui/catalog.js';
 import { renderCart } from './ui/cart.js';
 import { renderActivityLog } from './ui/activity-log.js';
+import { initChatPanel } from './ui/chat-panel.js';
 
 const catalogEl = document.getElementById('catalog');
 const cartEl = document.getElementById('cart');
@@ -37,15 +39,8 @@ function wireDevForm(formId, buildArgs) {
     const data = new FormData(form);
     const args = buildArgs(data);
     const toolName = form.dataset.tool ?? form.id.replace('form-', '');
-    try {
-      const testing = navigator.modelContextTesting;
-      if (!testing) throw new Error('navigator.modelContextTesting is unavailable');
-      const resultJson = await testing.executeTool(toolName, JSON.stringify(args));
-      const result = resultJson ? JSON.parse(resultJson) : null;
-      output.textContent = `${toolName}(${JSON.stringify(args)}) ->\n${JSON.stringify(result, null, 2)}`;
-    } catch (err) {
-      output.textContent = `${toolName}(${JSON.stringify(args)}) threw ->\n${err.message}`;
-    }
+    const result = await callRegisteredTool(toolName, args);
+    output.textContent = `${toolName}(${JSON.stringify(args)}) ->\n${JSON.stringify(result, null, 2)}`;
   });
 }
 
@@ -59,3 +54,17 @@ wireDevForm('form-add', (data) => ({
   quantity: Number(data.get('quantity')) || 1,
 }));
 wireDevForm('form-discount', (data) => ({ code: data.get('code') }));
+
+initChatPanel();
+
+if (import.meta.env.DEV) {
+  // Dev-only test hook (not present in a production build) so the chat
+  // agent loop's tool_use -> execute -> tool_result wiring, and its error
+  // classification, can be exercised against a mocked API response, without
+  // a real Anthropic key. See README.
+  Promise.all([import('./chat/agent.js'), import('@anthropic-ai/sdk')]).then(
+    ([{ runAgentTurn, ChatError }, { default: Anthropic }]) => {
+      window.__chatDevHooks = { runAgentTurn, ChatError, Anthropic };
+    }
+  );
+}
