@@ -1,0 +1,58 @@
+export const products = [
+  {
+    id: 'p1',
+    name: 'Wanderer Backpack',
+    price: 79.0,
+    tag: 'travel',
+    description: 'Weatherproof 30L pack with a padded laptop sleeve.',
+  },
+  {
+    id: 'p2',
+    name: 'Aeropress Go',
+    price: 39.5,
+    tag: 'coffee',
+    description: 'Compact travel coffee maker with a built-in mug.',
+  },
+  {
+    id: 'p3',
+    name: 'Trailhead Boots',
+    price: 128.0,
+    tag: 'outdoor',
+    description: 'Waterproof leather hiking boots with ankle support.',
+  },
+  {
+    id: 'p4',
+    name: 'Nomad Notebook',
+    price: 14.0,
+    tag: 'office',
+    description: 'Dot-grid notebook with a water-resistant cover.',
+  },
+  {
+    id: 'p5',
+    name: 'Solar Lantern',
+    price: 24.99,
+    tag: 'outdoor',
+    description: 'Foldable solar-charged lantern for camping trips.',
+  },
+  {
+    id: 'p6',
+    name: 'Ceramic Pour-Over',
+    price: 32.0,
+    tag: 'coffee',
+    description: 'Single-cup ceramic dripper with a matte glaze finish.',
+  },
+  {
+    id: 'p7',
+    name: 'Desk Mat Pro',
+    price: 21.5,
+    tag: 'office',
+    description: 'Stitched-edge desk mat, 900x400mm, water-resistant.',
+  },
+  {
+    id: 'p8',
+    name: 'Packable Rain Shell',
+    price: 64.0,
+    tag: 'travel',
+    description: 'Ultralight rain jacket that packs into its own pocket.',
+  },
+];

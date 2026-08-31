@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ask My Site — WebMCP demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>Ask My Site</h1>
+      <p class="subtitle">
+        A tiny storefront that exposes <code>search_products</code>, <code>add_to_cart</code>, and
+        <code>apply_discount_code</code> as <a href="https://webmachinelearning.github.io/webmcp/" target="_blank" rel="noopener">WebMCP</a>
+        tools via <code>document.modelContext</code>.
+      </p>
+      <p class="status" id="mcp-status">Checking WebMCP availability&hellip;</p>
+    </header>
+
+    <main class="layout">
+      <section class="panel catalog-panel">
+        <h2>Catalog</h2>
+        <div id="catalog"></div>
+      </section>
+
+      <aside class="panel cart-panel">
+        <h2>Cart</h2>
+        <div id="cart"></div>
+      </aside>
+    </main>
+
+    <section class="panel dev-panel">
+      <h2>Dev Console <span class="hint">(calls the exact registered WebMCP tools — no Chrome flag required)</span></h2>
+      <div class="dev-forms">
+        <form id="form-search" class="dev-form">
+          <label>search_products
+            <input type="text" name="query" placeholder="query, e.g. coffee" required />
+          </label>
+          <button type="submit">Run</button>
+        </form>
+        <form id="form-add" class="dev-form">
+          <label>add_to_cart
+            <input type="text" name="product_id" placeholder="product_id, e.g. p1" required />
+          </label>
+          <label>qty
+            <input type="number" name="quantity" min="1" value="1" />
+          </label>
+          <button type="submit">Run</button>
+        </form>
+        <form id="form-discount" class="dev-form">
+          <label>apply_discount_code
+            <input type="text" name="code" placeholder="code, e.g. SAVE10" required />
+          </label>
+          <button type="submit">Run</button>
+        </form>
+      </div>
+      <pre id="dev-output" class="dev-output">Results of dev-console tool calls appear here.</pre>
+    </section>
+
+    <section class="panel log-panel">
+      <h2>Agent Activity Log</h2>
+      <div id="activity-log"></div>
+    </section>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
